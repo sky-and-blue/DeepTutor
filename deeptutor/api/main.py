@@ -7,6 +7,8 @@ from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from deeptutor.api.middleware.auth_middleware import AuthMiddleware
+
 from deeptutor.logging import get_logger
 from deeptutor.services.path_service import get_path_service
 
@@ -117,6 +119,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Failed to auto-start TutorBots: {e}")
 
+    try:
+        from deeptutor.services.auth.database import init_db
+        await init_db()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"数据库初始化失败: {e}")
+        logger.warning("应用将在无认证状态下运行")
+
     yield
 
     # Execute on shutdown
@@ -161,6 +171,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Configure authentication middleware
+app.add_middleware(AuthMiddleware)
+
 # Mount a filtered view over user outputs.
 # Only whitelisted artifact paths are readable through the static handler.
 path_service = get_path_service()
@@ -176,6 +189,8 @@ except Exception:
     if not user_dir.exists():
         user_dir.mkdir(parents=True)
 
+
+
 app.mount(
     "/api/outputs",
     SafeOutputStaticFiles(directory=str(user_dir), path_service=path_service),
@@ -186,6 +201,7 @@ app.mount(
 # Some router modules load YAML settings at import time.
 from deeptutor.api.routers import (
     agent_config,
+    auth,
     chat,
     co_writer,
     dashboard,
@@ -205,6 +221,7 @@ from deeptutor.api.routers import (
 )
 
 # Include routers
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(solve.router, prefix="/api/v1", tags=["solve"])
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(question.router, prefix="/api/v1/question", tags=["question"])

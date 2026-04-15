@@ -12,14 +12,78 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, status
+from deeptutor.services.auth import (
+    decode_token,
+    get_token,
+    get_user_by_id,
+)
+from deeptutor.logging import get_logger
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
+logger = get_logger("UnifiedWS")
+
+
+async def authenticate_websocket(ws: WebSocket, token: str | None = None) -> bool:
+    """
+    验证WebSocket连接的认证
+    
+    Args:
+        ws: WebSocket对象
+        token: 访问令牌
+        
+    Returns:
+        bool: 是否认证成功
+    """
+    if not token:
+        await ws.close(code=status.WS_1008_POLICY_VIOLATION, reason="未提供认证令牌")
+        return False
+    
+    try:
+        # 检查令牌是否在Redis中
+        token_data = await get_token(token)
+        if not token_data:
+            await ws.close(code=status.WS_1008_POLICY_VIOLATION, reason="无效的认证令牌")
+            return False
+        
+        # 解码令牌
+        payload = decode_token(token)
+        
+        # 获取用户ID
+        user_id_str = payload.get("sub")
+        if not user_id_str:
+            await ws.close(code=status.WS_1008_POLICY_VIOLATION, reason="无效的认证令牌")
+            return False
+        
+        # 转换用户ID为整数
+        try:
+            user_id = int(user_id_str)
+        except ValueError:
+            await ws.close(code=status.WS_1008_POLICY_VIOLATION, reason="无效的用户ID")
+            return False
+        
+        # 获取用户信息
+        user = await get_user_by_id(user_id)
+        if not user:
+            await ws.close(code=status.WS_1008_POLICY_VIOLATION, reason="用户不存在")
+            return False
+        
+        # 将用户信息存储到WebSocket状态中
+        ws.state.user = user
+        return True
+        
+    except Exception as e:
+        logger.error(f"WebSocket认证失败: {str(e)}")
+        await ws.close(code=status.WS_1008_POLICY_VIOLATION, reason="认证失败")
+        return False
 
 
 @router.websocket("/ws")
-async def unified_websocket(ws: WebSocket) -> None:
+async def unified_websocket(ws: WebSocket, token: str = Query(..., description="访问令牌")) -> None:
+    # 首先验证WebSocket连接的认证
+    if not await authenticate_websocket(ws, token):
+        return
+    
     await ws.accept()
     closed = False
     subscription_tasks: dict[str, asyncio.Task[None]] = {}

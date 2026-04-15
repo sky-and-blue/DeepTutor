@@ -20,6 +20,7 @@ import {
 import { useTranslation } from "react-i18next";
 import SessionList from "@/components/SessionList";
 import { TutorBotRecent } from "@/components/sidebar/TutorBotRecent";
+import { UserMenu } from "@/components/UserMenu";
 import type { SessionSummary } from "@/lib/session-api";
 
 interface NavEntry {
@@ -235,6 +236,7 @@ export function SidebarShell({
             </Link>
           );
         })}
+        <UserMenu />
         {footerSlot}
       </div>
     </aside>

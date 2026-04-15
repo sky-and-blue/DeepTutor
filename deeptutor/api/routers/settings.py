@@ -48,6 +48,7 @@ class SidebarNavOrder(BaseModel):
 class UISettings(BaseModel):
     theme: Literal["light", "dark"] = "light"
     language: Literal["zh", "en"] = "en"
+    allow_registration: Optional[bool] = None
     sidebar_description: Optional[str] = None
     sidebar_nav_order: Optional[SidebarNavOrder] = None
 

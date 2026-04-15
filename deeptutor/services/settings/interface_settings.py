@@ -19,6 +19,7 @@ INTERFACE_SETTINGS_FILE = _path_service.get_settings_file("interface")
 DEFAULT_UI_SETTINGS: dict[str, Any] = {
     "theme": "light",
     "language": "en",
+    "allow_registration": True,
 }
 
 

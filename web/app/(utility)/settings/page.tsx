@@ -68,6 +68,7 @@ type Catalog = {
 type UiSettings = {
   theme: "light" | "dark";
   language: "en" | "zh";
+  allow_registration?: boolean;
 };
 
 type ProviderOption = { value: string; label: string; base_url?: string };
@@ -367,8 +368,9 @@ function SettingsPageContent() {
   const isTourMode = searchParams.get("tour") === "true";
 
   const [status, setStatus] = useState<SystemStatus | null>(null);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [language, setLanguage] = useState<"en" | "zh">("en");
+  const [theme, setTheme] = useState<"light" | "dark"> ("light");
+  const [language, setLanguage] = useState<"en" | "zh"> ("en");
+  const [allowRegistration, setAllowRegistration] = useState<boolean>(true);
   const [catalog, setCatalog] = useState<Catalog>(defaultCatalog());
   const [draft, setDraft] = useState<Catalog>(defaultCatalog());
   const [activeService, setActiveService] = useState<ServiceName>("llm");
@@ -399,6 +401,7 @@ function SettingsPageContent() {
       setDraft(cloneCatalog(settingsPayload.catalog));
       setTheme(settingsPayload.ui.theme);
       setLanguage(settingsPayload.ui.language);
+      setAllowRegistration(settingsPayload.ui.allow_registration ?? true);
       if (settingsPayload.providers) setProviders(settingsPayload.providers);
 
       const statusResponse = await fetch(apiUrl("/api/v1/system/status"));
@@ -460,24 +463,37 @@ function SettingsPageContent() {
 
   // -- UI preference helpers ----------------------------------------------
 
-  const persistUi = async (nextTheme: "light" | "dark", nextLanguage: "en" | "zh") => {
+  const persistUi = async (nextTheme: "light" | "dark", nextLanguage: "en" | "zh", nextAllowRegistration?: boolean) => {
     await fetch(apiUrl("/api/v1/settings/ui"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ theme: nextTheme, language: nextLanguage }),
+      body: JSON.stringify({ 
+        theme: nextTheme, 
+        language: nextLanguage, 
+        allow_registration: nextAllowRegistration !== undefined ? nextAllowRegistration : allowRegistration 
+      }),
     });
   };
 
   const updateTheme = async (nextTheme: "light" | "dark") => {
     setTheme(nextTheme);
     applyThemePreference(nextTheme);
-    await persistUi(nextTheme, language);
+    await persistUi(nextTheme, language, allowRegistration);
   };
 
   const updateLanguage = async (nextLanguage: "en" | "zh") => {
     setLanguage(nextLanguage);
     writeStoredLanguage(nextLanguage);
-    await persistUi(theme, nextLanguage);
+    await persistUi(theme, nextLanguage, allowRegistration);
+  };
+
+  const updateAllowRegistration = async (value: boolean) => {
+    setAllowRegistration(value);
+    await fetch(apiUrl("/api/v1/settings/ui"), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ theme, language, allow_registration: value }),
+    });
   };
 
   // -- Catalog mutations --------------------------------------------------
@@ -891,6 +907,25 @@ function SettingsPageContent() {
                   }`}
                 >
                   {v === "en" ? "English" : "中文"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] text-[var(--muted-foreground)]">{t("Registration")}</span>
+            <div className="flex gap-0.5 rounded-lg bg-[var(--muted)] p-0.5">
+              {([true, false] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => updateAllowRegistration(v)}
+                  className={`rounded-md px-2.5 py-1 text-[12px] transition-all ${
+                    allowRegistration === v
+                      ? "bg-[var(--card)] font-medium text-[var(--foreground)] shadow-sm"
+                      : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                  }`}
+                >
+                  {v ? t("Enabled") : t("Disabled")}
                 </button>
               ))}
             </div>
