@@ -12,6 +12,7 @@ Environment Variables:
     AUTH_JWT__REFRESH_TOKEN_EXPIRE_DAYS: 刷新令牌过期时间(天) (默认: 7)
     
     AUTH_MYSQL__URL: MySQL 连接 URL (默认: mysql+aiomysql://root@localhost:3306/deeptutor_auth)
+    AUTH_MYSQL__PASSWORD: MySQL 密码（如果在URL中未指定）
     AUTH_MYSQL__POOL_SIZE: 数据库连接池大小 (默认: 10)
     AUTH_MYSQL__MAX_OVERFLOW: 连接池最大溢出数量 (默认: 5)
     
@@ -30,6 +31,7 @@ Examples:
 """
 
 import secrets
+from typing import Optional
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -65,6 +67,10 @@ class MySQLConfig(BaseModel):
     url: str = Field(
         default="mysql+aiomysql://root@localhost:3306/deeptutor_auth",
         description="MySQL 连接 URL"
+    )
+    password: Optional[str] = Field(
+        default=None,
+        description="MySQL 密码（如果在URL中未指定）"
     )
     pool_size: int = Field(
         default=10,

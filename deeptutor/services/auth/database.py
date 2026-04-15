@@ -27,8 +27,20 @@ def get_engine():
     """
     global _engine
     if _engine is None:
+        # 使用配置的 URL
+        db_url = auth_settings.mysql.url
+        
+        # 如果设置了密码且 URL 中没有包含密码，则修改 URL 添加密码
+        if auth_settings.mysql.password and '@' in db_url:
+            # 解析 URL 并添加密码
+            from sqlalchemy import make_url
+            url = make_url(db_url)
+            if not url.password:
+                # 重建 URL 并添加密码
+                db_url = f"{url.drivername}://{url.username}:{auth_settings.mysql.password}@{url.host}:{url.port}/{url.database}"
+        
         _engine = create_async_engine(
-            auth_settings.mysql.url,
+            db_url,
             pool_size=auth_settings.mysql.pool_size,
             max_overflow=auth_settings.mysql.max_overflow,
             pool_pre_ping=True,
